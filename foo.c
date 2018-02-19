@@ -14,7 +14,7 @@ private:
   enum {}
   class foo1_abc: public hij {
     int i;
-  }
+  } /*  */
 
  public:
   typedef long int my_int;
@@ -22,7 +22,7 @@ private:
 
 
 //
-class hij
+class ABC::hij
 {
   int a;
 }
@@ -47,5 +47,4 @@ class xyz
   bool f_b(); 
   int i;
   void f_c() {int x=0;}
-  
-
+}

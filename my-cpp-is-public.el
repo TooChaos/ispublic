@@ -1,14 +1,13 @@
 
-
 (defun my-cpp-find-class-name (end-pt)
   (interactive);; todo ignore comment
-  (if  (re-search-forward
-     "^[[:blank:]]*class[[:blank:]]+\\([[:word:]]+\\(:\\{2\\}[[:word:]]+\\)*\\)"
-     end-pt t)
-      (if (match-string 1)
-          (match-string 1)
-        (user-error "no class name found"))
-    (user-error "no class name found")));; do not consider template now
+  (let ((pattern
+   "^[[:blank:]]*class[[:blank:]]+\\([[:word:]_]+\\(:\\{2\\}[[:word:]_]+\\)*\\)"))
+    (if (re-search-forward pattern end-pt t)
+        (if (match-string 1)
+            (match-string 1)
+          (user-error "no class name found"))
+      (user-error "no class name found"))));; do not consider template now
 
 
 (defun my-cpp-is-a-class ()
@@ -17,25 +16,30 @@
       (user-error "my-cpp-is-a-class: Abort! Internal error!  only works on {")) ;; todo: better error handling? do we have assertion?
 
   (save-excursion
-   (let ((end-pt (point))
-        class-name
-        pt-class)
-    ;; todo: ignore comment
-    ;; todo: let search stops at  {}(); or class name
-    (if (re-search-backward "^[[:blank:]]*class[[:blank:]]+[[:word:]]+"  (point-min) t)
-        (progn
-          (setq pt-class (point))
-          (setq class-name 
-                (concat (current-word) " " (my-cpp-find-class-name end-pt)))
-          (goto-char pt-class)
-          (if (re-search-forward "[{}();]" end-pt t)
-              nil ;; not a class
-            class-name)
-          (concat class-name)) ;; return class name
-      (progn
-        (user-error "my-cpp-is-a-class: Abort! Not in a class."))))))
-
-
+    (let ((end-pt (point))
+          (class-name nil)
+          pt-class
+          (search-done nil)
+          (not-a-class nil))
+      ;; todo: ignore comment
+      ;; todo: let search stops at  {}(); or class name
+      (while (not search-done)
+        (if (re-search-backward "^[[:blank:]]*class[[:blank:]]+[[:word:]_]+"  (point-min) t)
+            (if (null (nth 8 (syntax-ppss)))
+                (progn
+                  (setq pt-class (point))
+                  (setq class-name 
+                        (concat (current-word) " "
+                                (my-cpp-find-class-name end-pt)))
+                  ;;                  (goto-char pt-class)
+                  (setq search-done t)
+                  (while (and class-name (re-search-forward "[{}();]" end-pt t))
+                    (if (null (nth 8 (syntax-ppss)))
+                        (setq class-name nil))))) ;; not a class
+;;                  (user-error  (concat "test: " class-name))))) ;; test
+;;                    class-name)))
+          (setq search-done t)))
+        class-name)))
 
 
 (defun my-cpp-is-public ()
@@ -54,15 +58,17 @@
           (ignore 0)
           pattern-matched1  
           pattern-matched2
-          result)
+          result
+          (not-comment-or-string nil))
 
       (while (and (not found) (re-search-backward pattern (point-min) t))
+        (setq not-comment-or-string (null (nth 8 (syntax-ppss))))
         ;; pattern-matched1 is nil, public,private, or protected
         (setq pattern-matched1 (if (match-string 1) (match-string 1) ""))
         ;; pattern-matched2 is nil, {, or}
         (setq pattern-matched2 (if (match-string 2) (match-string 2) ""))
 
-        (if (and (= ignore 0) (not type)
+        (if (and not-comment-or-string (= ignore 0) (not type)
                  (string-match "public\\|protected\\|private" pattern-matched1))
             (setq type pattern-matched1)
           (if (string-match "\{" pattern-matched2)
@@ -89,10 +95,3 @@
           (user-error "not in a class! Exit!")
         (message "%s" result)))))
 
-;; first create a git project:
-;; todo:
-;; 0. comment
-;; 1. handle preprocessor? does it matter?
-;; 2. struct
-;; 3. template ??
-;; 4. some small todo in between the code 
